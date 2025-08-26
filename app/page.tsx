@@ -90,6 +90,28 @@ export default function EditorPage() {
     }
   };
 
+  // === New: Save handler ===
+  const handleSave = async () => {
+    try {
+      const response = await fetch("/api/component", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save component");
+      }
+
+      const data = await response.json();
+      alert(`Component saved with ID: ${data.id}`);
+      // You can store data.id if you want to load or update later
+    } catch (error) {
+      console.error(error);
+      alert("Error saving component. Check console for details.");
+    }
+  };
+
   return (
     <div className="flex h-screen bg-background text-foreground">
       {/* Left Panel: Style Inspector */}
@@ -102,8 +124,14 @@ export default function EditorPage() {
 
       {/* Right Panel: Main View */}
       <main className="flex-1 flex flex-col">
-        <header className="flex items-center justify-center p-2 border-b border-border">
+        <header className="flex items-center justify-center p-2 border-b border-border space-x-4">
           <ViewToggle view={view} setView={setView} />
+          <button
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+            onClick={handleSave}
+          >
+            Save Component
+          </button>
         </header>
         <div className="flex-1 relative">
           {view === "preview" && <Preview code={code} />}

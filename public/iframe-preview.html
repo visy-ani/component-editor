@@ -26,6 +26,16 @@
     <div id="root"></div>
     <script type="module">
       let currentSelection = null;
+      let reactRoot = null; // Store the root instance globally
+
+      // Initialize the root only once
+      const initializeRoot = () => {
+        if (!reactRoot) {
+          const container = document.getElementById("root");
+          reactRoot = ReactDOM.createRoot(container);
+        }
+      };
+
       const injectInspector = () => {
         let idCounter = 0;
         document.querySelectorAll("#root *").forEach((el) => {
@@ -56,6 +66,9 @@
 
       const compileAndRender = (jsxCode) => {
         try {
+          // Ensure root is initialized
+          initializeRoot();
+
           // Transform JSX to regular JavaScript
           const transformedCode = Babel.transform(jsxCode, {
             presets: ["react"],
@@ -72,20 +85,29 @@
           const componentFunction = new Function("React", `${cleanCode}`);
           const Component = componentFunction(React);
 
-          // Reset the root and render
-          document.getElementById("root").innerHTML = "";
-          const root = ReactDOM.createRoot(document.getElementById("root"));
-          root.render(React.createElement(Component));
+          // Use the existing root to render (don't create a new one!)
+          reactRoot.render(React.createElement(Component));
 
           setTimeout(injectInspector, 100);
         } catch (error) {
           console.error("Render Error:", error);
-          document.getElementById(
-            "root"
-          ).innerHTML = `<div style="color: red; padding: 20px; font-family: monospace;">
-              <h3>Render Error:</h3>
-              <pre>${error.message}</pre>
-            </div>`;
+          initializeRoot();
+          reactRoot.render(
+            React.createElement(
+              "div",
+              {
+                style: {
+                  color: "red",
+                  padding: "20px",
+                  fontFamily: "monospace",
+                },
+              },
+              [
+                React.createElement("h3", { key: "title" }, "Render Error:"),
+                React.createElement("pre", { key: "error" }, error.message),
+              ]
+            )
+          );
         }
       };
 
