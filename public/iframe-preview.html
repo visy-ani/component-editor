@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Preview Sandbox</title>
+    <!-- React + ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel Standalone for JSX transformation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        margin: 0;
+        font-family: sans-serif;
+        background-color: white;
+      }
+      .element-selected {
+        outline: 2px dashed #f43f5e !important;
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      let currentSelection = null;
+      const injectInspector = () => {
+        let idCounter = 0;
+        document.querySelectorAll("#root *").forEach((el) => {
+          if (el.dataset.editorId) return;
+          const elementId = `el-${idCounter++}`;
+          el.dataset.editorId = elementId;
+          el.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (currentSelection) {
+              currentSelection.classList.remove("element-selected");
+            }
+            el.classList.add("element-selected");
+            currentSelection = el;
+            window.parent.postMessage(
+              {
+                type: "ELEMENT_SELECTED",
+                data: {
+                  id: elementId,
+                  tag: el.tagName.toLowerCase(),
+                },
+              },
+              "*"
+            );
+          });
+        });
+      };
+
+      const compileAndRender = (jsxCode) => {
+        try {
+          // Transform JSX to regular JavaScript
+          const transformedCode = Babel.transform(jsxCode, {
+            presets: ["react"],
+            filename: "component.jsx",
+          }).code;
+
+          // Create a function that returns the component
+          // Remove import statements and export default, replace with direct component
+          let cleanCode = transformedCode
+            .replace(/import\s+.*?from\s+['"][^'"]*['"];?\s*/g, "") // Remove imports
+            .replace(/export\s+default\s+/, "return "); // Replace export default with return
+
+          // Wrap in a function and execute it to get the component
+          const componentFunction = new Function("React", `${cleanCode}`);
+          const Component = componentFunction(React);
+
+          // Reset the root and render
+          document.getElementById("root").innerHTML = "";
+          const root = ReactDOM.createRoot(document.getElementById("root"));
+          root.render(React.createElement(Component));
+
+          setTimeout(injectInspector, 100);
+        } catch (error) {
+          console.error("Render Error:", error);
+          document.getElementById(
+            "root"
+          ).innerHTML = `<div style="color: red; padding: 20px; font-family: monospace;">
+              <h3>Render Error:</h3>
+              <pre>${error.message}</pre>
+            </div>`;
+        }
+      };
+
+      window.addEventListener("message", (event) => {
+        const { type, payload } = event.data || {};
+        if (type === "RENDER_CODE") {
+          compileAndRender(payload.code);
+        }
+        if (type === "UPDATE_STYLE") {
+          const { elementId, newStyles } = payload;
+          const el = document.querySelector(`[data-editor-id="${elementId}"]`);
+          if (el) {
+            Object.assign(el.style, newStyles);
+          }
+        }
+      });
+
+      // Default render so iframe shows something on load
+      compileAndRender(`
+        export default function Demo() {
+          return (
+            <div className="p-6 text-center text-white bg-blue-600 rounded-xl shadow-lg">
+              Hello from Preview 🚀
+            </div>
+          );
+        }
+      `);
+    </script>
+  </body>
+</html>
