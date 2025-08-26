@@ -1,34 +1,59 @@
 "use client";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function Preview({ code }) {
   const iframeRef = useRef(null);
   const isIframeLoaded = useRef(false);
+  const [fetchedCode, setFetchedCode] = useState(null);
+
+  const activeCode = code || fetchedCode;
 
   const postCodeToIframe = useCallback(() => {
-    if (iframeRef.current?.contentWindow && code && isIframeLoaded.current) {
+    if (
+      iframeRef.current?.contentWindow &&
+      activeCode &&
+      isIframeLoaded.current
+    ) {
       iframeRef.current.contentWindow.postMessage(
-        { type: "RENDER_CODE", payload: { code } },
+        { type: "RENDER_CODE", payload: { code: activeCode } },
         "*"
       );
     }
-  }, [code]);
+  }, [activeCode]);
 
-  // Handle iframe load
   const handleIframeLoad = useCallback(() => {
     isIframeLoaded.current = true;
-    // Send code once iframe is ready
-    if (code) {
-      postCodeToIframe();
-    }
-  }, [code, postCodeToIframe]);
+    postCodeToIframe();
+  }, [postCodeToIframe]);
 
-  // Re-send whenever code changes, but only if iframe is already loaded
   useEffect(() => {
-    if (isIframeLoaded.current) {
+    if (code) return; 
+
+    const id = localStorage.getItem("savedComponentId");
+    if (!id) return;
+
+    fetch(`/api/component/${id}`)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (data?.code) {
+          setFetchedCode(data.code);
+        }
+      })
+      .catch((err) => {
+        console.error("Error loading component:", err);
+      });
+  }, [code]);
+
+  useEffect(() => {
+    if (activeCode && isIframeLoaded.current) {
       postCodeToIframe();
     }
-  }, [code, postCodeToIframe]);
+  }, [activeCode, postCodeToIframe]);
 
   return (
     <iframe

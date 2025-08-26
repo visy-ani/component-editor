@@ -13,7 +13,7 @@ export function useTheme() {
       setTheme(localTheme);
       root.classList.add(localTheme);
     } else {
-      root.classList.add("light"); // Default to light theme
+      root.classList.add("light");
     }
   }, []);
 

@@ -3,12 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <title>Preview Sandbox</title>
-    <!-- React + ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <!-- Babel Standalone for JSX transformation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       body {
@@ -26,9 +23,8 @@
     <div id="root"></div>
     <script type="module">
       let currentSelection = null;
-      let reactRoot = null; // Store the root instance globally
+      let reactRoot = null;
 
-      // Initialize the root only once
       const initializeRoot = () => {
         if (!reactRoot) {
           const container = document.getElementById("root");
@@ -66,26 +62,20 @@
 
       const compileAndRender = (jsxCode) => {
         try {
-          // Ensure root is initialized
           initializeRoot();
 
-          // Transform JSX to regular JavaScript
           const transformedCode = Babel.transform(jsxCode, {
             presets: ["react"],
             filename: "component.jsx",
           }).code;
 
-          // Create a function that returns the component
-          // Remove import statements and export default, replace with direct component
           let cleanCode = transformedCode
-            .replace(/import\s+.*?from\s+['"][^'"]*['"];?\s*/g, "") // Remove imports
-            .replace(/export\s+default\s+/, "return "); // Replace export default with return
+            .replace(/import\s+.*?from\s+['"][^'"]*['"];?\s*/g, "") 
+            .replace(/export\s+default\s+/, "return "); 
 
-          // Wrap in a function and execute it to get the component
           const componentFunction = new Function("React", `${cleanCode}`);
           const Component = componentFunction(React);
 
-          // Use the existing root to render (don't create a new one!)
           reactRoot.render(React.createElement(Component));
 
           setTimeout(injectInspector, 100);
@@ -125,7 +115,6 @@
         }
       });
 
-      // Default render so iframe shows something on load
       compileAndRender(`
         export default function Demo() {
           return (

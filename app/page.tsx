@@ -6,7 +6,8 @@ import { CodeEditor } from "@/components/editor/CodeEditor";
 import { Preview } from "@/components/editor/Preview";
 import { ViewToggle } from "@/components/editor/ViewToggle";
 
-const initialCode = `
+const fallbackCode = `
+// Default fallback component
 import React from 'react';
 
 export default function MyComponent() {
@@ -28,24 +29,40 @@ export default function MyComponent() {
 
 export default function EditorPage() {
   const [view, setView] = useState<"preview" | "code">("preview");
-  const [code, setCode] = useState(initialCode);
+  const [code, setCode] = useState<string>(fallbackCode);
 
-  interface ElementSelectedData {
+  const [selectedElement, setSelectedElement] = useState<{
     id: string;
     [key: string]: string | number | boolean | null;
-  }
-
-  const [selectedElement, setSelectedElement] =
-    useState<ElementSelectedData | null>(null);
+  } | null>(null);
 
   useEffect(() => {
-    interface MessageEventData {
-      type: string;
-      data: ElementSelectedData;
-    }
+    const loadSavedCode = async () => {
+      const id = localStorage.getItem("savedComponentId");
+      if (!id) return;
 
-    const handleMessage = (event: MessageEvent<MessageEventData>) => {
-      // Ensure the message is from our iframe, not other browser extensions
+      try {
+        const res = await fetch(`/api/component/${id}`);
+        if (!res.ok) throw new Error("Component not found");
+
+        const data = await res.json();
+        if (data?.code) {
+          setCode(data.code);
+        } else {
+          console.warn("No code found in response. Loading fallback.");
+          setCode(fallbackCode);
+        }
+      } catch (error) {
+        console.error("Error loading component:", error);
+        setCode(fallbackCode);
+      }
+    };
+
+    loadSavedCode();
+  }, []);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
       if (
         (event.source as Window | null)?.location?.pathname !==
         "/iframe-preview.html"
@@ -53,9 +70,8 @@ export default function EditorPage() {
         return;
       }
 
-      const { type, data } = event.data;
-      if (type === "ELEMENT_SELECTED") {
-        setSelectedElement(data);
+      if (event.data?.type === "ELEMENT_SELECTED") {
+        setSelectedElement(event.data.data);
       }
     };
 
@@ -63,34 +79,25 @@ export default function EditorPage() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  interface StyleChangePayload {
-    elementId: string;
-    newStyles: Record<string, string>;
-  }
-
-  interface UpdateStyleMessage {
-    type: "UPDATE_STYLE";
-    payload: StyleChangePayload;
-  }
-
   const handleStyleChange = (
     elementId: string,
     newStyles: Record<string, string>
-  ): void => {
+  ) => {
     const iframe = document.querySelector(
       'iframe[title="Component Preview"]'
     ) as HTMLIFrameElement | null;
 
     if (iframe?.contentWindow) {
-      const message: UpdateStyleMessage = {
-        type: "UPDATE_STYLE",
-        payload: { elementId, newStyles },
-      };
-      iframe.contentWindow.postMessage(message, "*");
+      iframe.contentWindow.postMessage(
+        {
+          type: "UPDATE_STYLE",
+          payload: { elementId, newStyles },
+        },
+        "*"
+      );
     }
   };
 
-  // === New: Save handler ===
   const handleSave = async () => {
     try {
       const response = await fetch("/api/component", {
@@ -99,22 +106,19 @@ export default function EditorPage() {
         body: JSON.stringify({ code }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to save component");
-      }
+      if (!response.ok) throw new Error("Failed to save component");
 
       const data = await response.json();
-      alert(`Component saved with ID: ${data.id}`);
-      // You can store data.id if you want to load or update later
+      localStorage.setItem("savedComponentId", data.id);
+      alert(`Component saved! ID: ${data.id}`);
     } catch (error) {
-      console.error(error);
-      alert("Error saving component. Check console for details.");
+      console.error("Error saving component:", error);
+      alert("Error saving component. Check console.");
     }
   };
 
   return (
     <div className="flex h-screen bg-background text-foreground">
-      {/* Left Panel: Style Inspector */}
       <aside className="w-[350px] border-r border-border flex-shrink-0">
         <StyleInspector
           selectedElement={selectedElement}
@@ -122,7 +126,6 @@ export default function EditorPage() {
         />
       </aside>
 
-      {/* Right Panel: Main View */}
       <main className="flex-1 flex flex-col">
         <header className="flex items-center justify-center p-2 border-b border-border space-x-4">
           <ViewToggle view={view} setView={setView} />
